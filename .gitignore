@@ -174,3 +174,5 @@ cython_debug/
 .pypirc
 
 /.vs
+
+dk_agent_logs/
