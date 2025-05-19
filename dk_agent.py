@@ -2,8 +2,9 @@ import os
 import ale_py
 import torch
 import gymnasium as gym
-from stable_baselines3 import DQN
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3 import DQN, A2C, PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecFrameStack
+from stable_baselines3.common.env_util import make_atari_env
 from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.evaluation import evaluate_policy
 
@@ -30,31 +31,33 @@ class DonkeyKongAgent:
         return torch.device("cpu")
 
     def _make_vector_envs(self):
-        def make_env_fn(i):
-            def _init():
-                env = gym.make(self.env_id, render_mode=self.render_mode)
-                env.reset(seed=i)
-                env = AtariWrapper(env)
-                return env
-
-            return _init
-
-        if self.num_envs == 1:
-            return DummyVecEnv([make_env_fn(0)])
-        else:
-            return SubprocVecEnv([make_env_fn(i) for i in range(self.num_envs)])
+        env = make_atari_env(
+            self.env_id,
+            n_envs=self.num_envs,
+            seed=0,
+            env_kwargs={"render_mode": self.render_mode},
+        )
+        env = VecFrameStack(env, n_stack=4)
+        return env
 
     def train(self, timesteps=100_000):
+        # self.model = DQN(
+        #     "CnnPolicy",
+        #     self.env,
+        #     verbose=0,
+        #     buffer_size=100_000,
+        #     learning_starts=50_000,
+        #     exploration_fraction=0.1,
+        #     exploration_final_eps=0.05,
+        #     tensorboard_log="./dk_agent_logs/",
+        #     device=self.device,
+        # )
         self.model = DQN(
             "CnnPolicy",
             self.env,
             verbose=1,
-            buffer_size=10000,
-            learning_starts=1000,
-            exploration_fraction=0.1,
-            exploration_final_eps=0.05,
+            device=self.device,
             tensorboard_log="./dk_agent_logs/",
-            device="mps" if torch.backends.mps.is_available() else "cpu",
         )
         self.model.learn(total_timesteps=timesteps)
         self.model.save(self.model_path)
@@ -75,14 +78,21 @@ class DonkeyKongAgent:
         )
         print(f"Mean reward: {mean_reward}, Std: {std_reward}")
 
-    def play(self):
+    def play(self, n_episodes=1):
         if self.model is None:
             raise RuntimeError("Model is not loaded. Call train() or load() first.")
-        env = AtariWrapper(gym.make(self.env_id, render_mode="human"))
-        obs, _ = env.reset()
-        done = False
-        while not done:
-            action, _states = self.model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-        env.close()
+
+        def make_env():
+            env = gym.make(self.env_id, render_mode="human")
+            return AtariWrapper(env)
+
+        vec_env = DummyVecEnv([make_env])
+        vec_env = VecFrameStack(vec_env, n_stack=4)
+
+        for _ in range(n_episodes):
+            obs = vec_env.reset()
+            done = [False]
+            while not any(done):
+                action, _ = self.model.predict(obs, deterministic=True)
+                obs, reward, done, info = vec_env.step(action)
+        vec_env.close()
