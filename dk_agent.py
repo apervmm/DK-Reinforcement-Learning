@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 import ale_py
 import torch
 import gymnasium as gym
@@ -7,6 +8,27 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecFram
 from stable_baselines3.common.env_util import make_atari_env
 from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.evaluation import evaluate_policy
+
+
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
 
 
 class DonkeyKongAgent:
@@ -52,12 +74,19 @@ class DonkeyKongAgent:
         #     tensorboard_log="./dk_agent_logs/",
         #     device=self.device,
         # )
-        self.model = DQN(
+        self.model = PPO(
             "CnnPolicy",
             self.env,
             verbose=1,
             device=self.device,
             tensorboard_log="./dk_agent_logs/",
+            n_steps=512,
+            n_epochs=4,
+            batch_size=256,
+            learning_rate=linear_schedule(2.5e-4),
+            clip_range=linear_schedule(0.1),
+            vf_coef=0.5,
+            ent_coef=0.1,
         )
         self.model.learn(total_timesteps=timesteps)
         self.model.save(self.model_path)
@@ -65,7 +94,7 @@ class DonkeyKongAgent:
 
     def load(self):
         if os.path.exists(f"{self.model_path}.zip"):
-            self.model = DQN.load(self.model_path, env=self.env)
+            self.model = PPO.load(self.model_path, env=self.env)
             print("Model loaded successfully.")
         else:
             raise FileNotFoundError(f"No model found at {self.model_path}")
