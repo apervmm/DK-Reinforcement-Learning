@@ -40,7 +40,6 @@ class DonkeyKongAgent:
         self.device = self._detect_device()
         self.env = self._make_vector_envs()
         self.model = None
-        self.model = None
 
     def _detect_device(self):
         if torch.cuda.is_available():
