@@ -33,17 +33,37 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 
 
 class DonkeyKongRewardWrapper(gym.Wrapper):
+    """
+    Custom reward wrapper that gives additional reward for climbing (detected via RAM state).
+    """
+
     def __init__(self, env, y_index=34):
+        """
+        :param env: Gym environment to wrap
+        :param y_index: RAM index tracking Mario's vertical position.
+        """
         super().__init__(env)
         self.prev_y = None
         self.y_index = y_index
 
     def reset(self, **kwargs):
+        """
+        Reset the environment and store Mario's initial vertical position.
+
+        :param kwargs: Additional arguments for env.reset().
+        :return: Observation and information.
+        """
         obs, info = self.env.reset(**kwargs)
         self.prev_y = self.env.unwrapped.ale.getRAM()[self.y_index]
         return obs, info
 
     def step(self, action):
+        """
+        Take an action and apply reward shaping based on vertical progress.
+
+        :param action: Action to take in the environment.
+        :return: Tuple of (obs, shaped_reward, terminated, truncated, info).
+        """
         obs, reward, terminated, truncated, info = self.env.step(action)
         ram = self.env.unwrapped.ale.getRAM()
         curr_y = ram[self.y_index]
@@ -57,7 +77,16 @@ class DonkeyKongRewardWrapper(gym.Wrapper):
 
 
 class DonkeyKongAgent:
+    """
+    Agent class for training and evaluating  reinforcement learning model on the Donkey Kong game
+    """
+
     def __init__(self, render_mode=None, model_path="dk_agent", num_envs=1):
+        """
+        :param render_model: Rendering mode for the environment (e.g., 'human').
+        :param model_path: Path to save/load the trained model.
+        :param num_envs: Number of parallel environments.
+        """
         self.env_id = "ALE/DonkeyKong-v5"
         self.render_mode = render_mode
         self.model_path = model_path
@@ -67,6 +96,11 @@ class DonkeyKongAgent:
         self.model = None
 
     def _detect_device(self):
+        """
+        Identifies the appropriate computing device (GPU, MPS, or CPU).
+
+        :return: Torch device object.
+        """
         if torch.cuda.is_available():
             print("Using CUDA")
             return torch.device("cuda")
@@ -77,6 +111,11 @@ class DonkeyKongAgent:
         return torch.device("cpu")
 
     def _make_vector_envs(self):
+        """
+        Creates a vectorized environment with custom reward shaping and frame stacking.
+
+        :return: A vectorized and stacked Gym environment.
+        """
         def make_env(rank):
             def _init():
                 base_env = gym.make(
@@ -95,6 +134,11 @@ class DonkeyKongAgent:
         return env
 
     def train(self, timesteps=100_000):
+        """
+        Train the RL model for a given number of timesteps.
+
+        :param timesteps: Total number of training steps.
+        """
         # self.model = DQN(
         #     "CnnPolicy",
         #     self.env,
@@ -125,6 +169,11 @@ class DonkeyKongAgent:
         print(f"Model saved to {self.model_path}")
 
     def load(self):
+        """
+        Load a pre-trained RL model from the specified path.
+
+        :raises FileNotFoundError: If the model file does not exist.
+        """
         if os.path.exists(f"{self.model_path}.zip"):
             self.model = PPO.load(self.model_path, env=self.env)
             print("Model loaded successfully.")
@@ -132,16 +181,28 @@ class DonkeyKongAgent:
             raise FileNotFoundError(f"No model found at {self.model_path}")
 
     def evaluate(self, n_episodes=5):
+        """
+        Evaluate the model over a number of episodes.
+
+        :param n_episodes: Number of evaluation episodes.
+        """
         if self.model is None:
-            raise RuntimeError("Model is not loaded. Call train() or load() first.")
+            raise RuntimeError(
+                "Model is not loaded. Call train() or load() first.")
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_episodes
         )
         print(f"Mean reward: {mean_reward}, Std: {std_reward}")
 
     def play(self, n_episodes=1):
+        """
+        Run the trained model in human-rendered mode for visual observation.
+
+        :param n_episodes: Number of playthrough episodes.
+        """
         if self.model is None:
-            raise RuntimeError("Model is not loaded. Call train() or load() first.")
+            raise RuntimeError(
+                "Model is not loaded. Call train() or load() first.")
 
         def make_env():
             env = gym.make(self.env_id, render_mode="human")
