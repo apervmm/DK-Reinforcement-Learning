@@ -156,7 +156,7 @@ class DonkeyKongAgent:
             verbose=1,
             device=self.device,
             tensorboard_log="./dk_agent_logs/",
-            n_steps=512,
+            n_steps=128,
             n_epochs=4,
             batch_size=256,
             learning_rate=linear_schedule(2.5e-4),
