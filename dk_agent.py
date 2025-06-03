@@ -5,6 +5,7 @@ import torch
 import gymnasium as gym
 from stable_baselines3 import DQN, A2C, PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecFrameStack
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_util import make_atari_env
 from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -31,6 +32,30 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
     return func
 
 
+class DonkeyKongRewardWrapper(gym.Wrapper):
+    def __init__(self, env, y_index=34):
+        super().__init__(env)
+        self.prev_y = None
+        self.y_index = y_index
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        self.prev_y = self.env.unwrapped.ale.getRAM()[self.y_index]
+        return obs, info
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        ram = self.env.unwrapped.ale.getRAM()
+        curr_y = ram[self.y_index]
+
+        shaped_reward = reward
+        if self.prev_y is not None and curr_y < self.prev_y:
+            shaped_reward += 0.5  # climbing = progress
+
+        self.prev_y = curr_y
+        return obs, shaped_reward, terminated, truncated, info
+
+
 class DonkeyKongAgent:
     def __init__(self, render_mode=None, model_path="dk_agent", num_envs=1):
         self.env_id = "ALE/DonkeyKong-v5"
@@ -52,12 +77,20 @@ class DonkeyKongAgent:
         return torch.device("cpu")
 
     def _make_vector_envs(self):
-        env = make_atari_env(
-            self.env_id,
-            n_envs=self.num_envs,
-            seed=0,
-            env_kwargs={"render_mode": self.render_mode},
-        )
+        def make_env(rank):
+            def _init():
+                base_env = gym.make(
+                    self.env_id, render_mode=self.render_mode, frameskip=1
+                )
+                base_env = AtariWrapper(base_env)
+                shaped_env = DonkeyKongRewardWrapper(
+                    base_env, y_index=34
+                )  # index might be incorrect, check RAM
+                return Monitor(shaped_env)
+
+            return _init
+
+        env = SubprocVecEnv([make_env(i) for i in range(self.num_envs)])
         env = VecFrameStack(env, n_stack=4)
         return env
 
