@@ -2,6 +2,7 @@ import os
 from typing import Callable
 import ale_py
 import torch
+import numpy as np
 import gymnasium as gym
 from stable_baselines3 import DQN, A2C, PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecFrameStack
@@ -34,46 +35,54 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
 
 class DonkeyKongRewardWrapper(gym.Wrapper):
     """
-    Custom reward wrapper that gives additional reward for climbing (detected via RAM state).
+    Custom reward wrapper that gives additional reward for climbing.
     """
 
-    def __init__(self, env, y_index=34):
+    def __init__(self, env, reward_scale=25, y_tolerance=1):
         """
-        :param env: Gym environment to wrap
-        :param y_index: RAM index tracking Mario's vertical position.
+        :param env: The environment to wrap.
+        :param reward_scale: Scale factor for the climbing reward.
+        :param y_tolerance: Minimum Y coordinate change to trigger reward.
         """
         super().__init__(env)
         self.prev_y = None
-        self.y_index = y_index
+        self.reward_scale = reward_scale
+        self.y_tolerance = y_tolerance
 
     def reset(self, **kwargs):
-        """
-        Reset the environment and store Mario's initial vertical position.
-
-        :param kwargs: Additional arguments for env.reset().
-        :return: Observation and information.
-        """
         obs, info = self.env.reset(**kwargs)
-        self.prev_y = self.env.unwrapped.ale.getRAM()[self.y_index]
+        self.prev_y = self._find_mario_y()
         return obs, info
 
     def step(self, action):
-        """
-        Take an action and apply reward shaping based on vertical progress.
-
-        :param action: Action to take in the environment.
-        :return: Tuple of (obs, shaped_reward, terminated, truncated, info).
-        """
         obs, reward, terminated, truncated, info = self.env.step(action)
-        ram = self.env.unwrapped.ale.getRAM()
-        curr_y = ram[self.y_index]
+        current_y = self._find_mario_y()
 
         shaped_reward = reward
-        if self.prev_y is not None and curr_y < self.prev_y:
-            shaped_reward += 0.5  # climbing = progress
+        if current_y is not None:
+            if self.prev_y is not None:
+                # Reward only if Y decreased significantly (Mario climbed)
+                if current_y < self.prev_y - self.y_tolerance:
+                    shaped_reward += self.reward_scale * (self.prev_y - current_y)
 
-        self.prev_y = curr_y
+                # if current_y < 170:
+                #     print("Mario is climbing up! Current Y:", current_y)
+
+            self.prev_y = current_y
         return obs, shaped_reward, terminated, truncated, info
+
+    def _find_mario_y(self) -> int | None:
+        """
+        Finds the topmost Y coordinate of two vertically stacked red pixels
+        with RGB (200, 72, 72), returns None if not found.
+        """
+        frame = self.env.unwrapped.ale.getScreenRGB()
+        red = np.array([200, 72, 72])
+        is_red = np.all(frame == red, axis=-1)  # shape: (h, w)
+        shifted = np.roll(is_red, shift=-1, axis=0)
+        mario_mask = is_red & shifted
+        y_coords, _ = np.where(mario_mask)
+        return int(np.min(y_coords)) if y_coords.size else None
 
 
 class DonkeyKongAgent:
@@ -116,15 +125,14 @@ class DonkeyKongAgent:
 
         :return: A vectorized and stacked Gym environment.
         """
+
         def make_env(rank):
             def _init():
                 base_env = gym.make(
-                    self.env_id, render_mode=self.render_mode, frameskip=1
+                    self.env_id, render_mode=self.render_mode, frameskip=4
                 )
                 base_env = AtariWrapper(base_env)
-                shaped_env = DonkeyKongRewardWrapper(
-                    base_env, y_index=34
-                )  # index might be incorrect, check RAM
+                shaped_env = DonkeyKongRewardWrapper(base_env)
                 return Monitor(shaped_env)
 
             return _init
@@ -187,8 +195,7 @@ class DonkeyKongAgent:
         :param n_episodes: Number of evaluation episodes.
         """
         if self.model is None:
-            raise RuntimeError(
-                "Model is not loaded. Call train() or load() first.")
+            raise RuntimeError("Model is not loaded. Call train() or load() first.")
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_episodes
         )
@@ -201,8 +208,7 @@ class DonkeyKongAgent:
         :param n_episodes: Number of playthrough episodes.
         """
         if self.model is None:
-            raise RuntimeError(
-                "Model is not loaded. Call train() or load() first.")
+            raise RuntimeError("Model is not loaded. Call train() or load() first.")
 
         def make_env():
             env = gym.make(self.env_id, render_mode="human")
