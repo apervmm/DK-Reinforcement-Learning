@@ -1,6 +1,6 @@
-#Donkey Kong Reinforcment Learning
+# Donkey Kong Reinforcment Learning
 
-##Set-up:
+## Set-up:
 1. Install Python 3.10
 2. pip install -r requirements.txt
 
@@ -11,12 +11,12 @@
 
 
 
-##Training own model:
+## Training own model:
 - ***train.py** incdicate the file where to save the model
 - ***Run:** python3 train.py
 
 
-##Architecture:
+## Architecture:
 1. ***dk_agent.py:*** This files includes the main logic of Reinforcment learning, setting up the environment, and reward wrapper
 2. ***train.py:*** Training script/executable of the program, which responsible for choosing managing the save file, number of parallel environments, and timesteps
 3. ***play.py:*** Testing script/executable of the program, which responsible for choosing managing the save file, number of parallel environments, and timesteps
