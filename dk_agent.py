@@ -156,12 +156,15 @@ class DonkeyKongAgent:
         #     "CnnPolicy",
         #     self.env,
         #     verbose=1,
-        #     buffer_size=100_000,
-        #     learning_starts=50_000,
-        #     exploration_fraction=0.1,
-        #     exploration_final_eps=0.05,
         #     tensorboard_log="./dk_agent_logs/",
         #     device=self.device,
+        # )
+        # self.model = PPO(
+        #     "CnnPolicy",
+        #     self.env,
+        #     verbose=1,
+        #     device=self.device,
+        #     tensorboard_log="./dk_agent_logs/",
         # )
         self.model = PPO(
             "CnnPolicy",
