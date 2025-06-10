@@ -135,28 +135,6 @@ class DonkeyKongAgent:
         print("Falling back to CPU")
         return torch.device("cpu")
 
-    # def _make_vector_envs(self):
-    #     """
-    #     Creates a vectorized environment with custom reward shaping and frame stacking.
-
-    #     :return: A vectorized and stacked Gym environment.
-    #     """
-
-    #     def make_env(rank):
-    #         def _init():
-    #             base_env = gym.make(
-    #                 self.env_id, render_mode=self.render_mode, frameskip=4
-    #             )
-    #             base_env = AtariWrapper(base_env)
-    #             shaped_env = DonkeyKongRewardWrapper(base_env)
-    #             return Monitor(shaped_env)
-
-    #         return _init
-
-    #     env = SubprocVecEnv([make_env(i) for i in range(self.num_envs)])
-    #     env = VecFrameStack(env, n_stack=4)
-    #     return env
-
     def _make_vector_envs(self):
         def make_env():
             base_env = gym.make(self.env_id, render_mode=self.render_mode)
