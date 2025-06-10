@@ -22,6 +22,9 @@ def find_mario_y(frame: np.ndarray) -> int | None:
 
 
 def main():
+    """
+    Manual play of Donkey Kong with RAM diff viewer.
+    """
     pygame.init()
     screen = pygame.display.set_mode((200, 200))  # Dummy window for key events
     pygame.display.set_caption("Donkey Kong RAM Diff Viewer")

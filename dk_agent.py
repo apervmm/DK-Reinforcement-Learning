@@ -67,17 +67,11 @@ class DonkeyKongRewardWrapper(gym.Wrapper):
         if current_y is not None and self.prev_y is not None:
             if current_y < self.prev_y - self.y_tolerance:
                 shaped_reward += self.y_multiplier * (self.prev_y - current_y)
-                print(
-                    f"Climbing reward: {self.y_multiplier * (self.prev_y - current_y)}"
-                )
 
         # Lateral movement reward
         if current_x is not None and self.prev_x is not None:
             if abs(current_x - self.prev_x) >= self.x_tolerance:
                 shaped_reward += self.x_multiplier * abs(current_x - self.prev_x)
-                # print(
-                #     f"Lateral movement reward: {self.x_multiplier * abs(current_x - self.prev_x)}"
-                # )
 
         self.prev_y = current_y
         self.prev_x = current_x
@@ -147,6 +141,7 @@ class DonkeyKongAgent:
             seed=0,
             vec_env_cls=SubprocVecEnv,
         )
+        # Create vectorized environment with 4 stacked frames
         env = VecFrameStack(env, n_stack=4)
         return env
 
@@ -156,6 +151,7 @@ class DonkeyKongAgent:
 
         :param timesteps: Total number of training steps.
         """
+        # Train model using DQN vs. PPO algorithm
         # self.model = DQN(
         #     "CnnPolicy",
         #     self.env,
@@ -231,10 +227,12 @@ class DonkeyKongAgent:
         )
         vec_env = VecFrameStack(env, n_stack=4)
 
+        # Run through the specified number of episodes
         for _ in range(n_episodes):
             obs = vec_env.reset()
             done = [False]
             while not any(done):
                 action, _ = self.model.predict(obs, deterministic=True)
+                # Take the next action in the environment
                 obs, reward, done, info = vec_env.step(action)
         vec_env.close()
