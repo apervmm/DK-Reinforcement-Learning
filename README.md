@@ -1,6 +1,5 @@
 # Donkey Kong Reinforcment Learning
 
-
 ## Preamble
 This project is an implementation of a reinforcement learning agent for Donkey Kong, developed as part of CSC 480 at California Polytechnic State University. 
 
@@ -45,3 +44,6 @@ The 3 models tested, including DQN, PPO, and PPO with added hyperparameters, are
 6. “Tensor Attributes — PyTorch 2.7 documentation.” [Online]. Available: https://docs.pytorch.org/docs/stable/tensor attributes.html#torch.device
 7. “Welcome to Stable Baselines docs! - RL Baselines Made Easy — Stable Baselines 2.10.3a0 documentation.” [Online]. Available: https://stable-baselines.readthedocs.io/en/master/index.html
 8. “DLR-RM/rl-baselines3-zoo,” Jun. 2025, original-date: 2020-05-05T05:53:27Z. [Online]. Available: https://github.com/DLR-RM/rl-baselines3-zoo
+
+# Developers
+Ryna Hu, Ryan Chan, Almas Perneshev, Sigourney Scott, Celvin Villago
